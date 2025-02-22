@@ -13,6 +13,9 @@ import android.view.View
 import android.os.Handler
 import android.os.Looper
 import android.os.Build
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
     private lateinit var sourceText: TextView
@@ -24,24 +27,36 @@ class MainActivity : AppCompatActivity() {
     private lateinit var speedText: TextView
     private lateinit var courseText: TextView
     private lateinit var symbolText: TextView
+	private lateinit var toCallText: TextView  // New TextView for "To Call"
+
+	private lateinit var currentTimeText: TextView  // New TextView for system time
 
     private var lastReceivedTimestamp: Long = 0
     private var incrementingTimestamp: Long = 0
+
     private val updateHandler = Handler(Looper.getMainLooper())
 
     // Runnable to update the timestamp every second (in milliseconds)
-    private val timestampRunnable = object : Runnable {
-        override fun run() {
-            if (lastReceivedTimestamp > 0) {
-                // Increment timestamp
-                incrementingTimestamp = System.currentTimeMillis() - lastReceivedTimestamp
-                val seconds = incrementingTimestamp / 1000 // Convert to seconds
-                val formattedTime = String.format("%02d:%02d:%02d", seconds / 3600, (seconds % 3600) / 60, seconds % 60)
-                timestampText.text = "Last Heard: $formattedTime"
-            }
-            updateHandler.postDelayed(this, 1000) // Update every second
-        }
-    }
+	private val timestampRunnable = object : Runnable {
+		override fun run() {
+			if (lastReceivedTimestamp > 0) {
+				// Increment timestamp
+				incrementingTimestamp = System.currentTimeMillis() - lastReceivedTimestamp
+				val seconds = incrementingTimestamp / 1000 // Convert to seconds
+				val formattedTime = String.format("%02d:%02d:%02d", seconds / 3600, (seconds % 3600) / 60, seconds % 60)
+				
+				// Get current system time
+				val currentTime = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
+
+				// Update TextView with last heard and current time
+				timestampText.text = "Last Heard: $formattedTime"
+				currentTimeText.text = "Time: $currentTime"
+				
+			}
+			updateHandler.postDelayed(this, 1000) // Update every second
+		}
+	}
+
 
     // Receiver for updates from APRSdroid
     private val aprsDroidReceiver = object : BroadcastReceiver() {
@@ -90,40 +105,42 @@ class MainActivity : AppCompatActivity() {
                 // Display the speed and course as integers
                 speedText.text = "Speed: $speed mph"  // Show speed as an integer (in km/h or desired unit)
                 courseText.text = "Course: $course°"  // Show course as an integer (in degrees)
+				
+				// Function to extract parsedTocall from the packet
+				fun extractParsedTocall(packet: String): String? {
+					// Regular expression to match text between '>' and first ',' or ';'
+					val regex = ">([^,:]+)".toRegex()
+					val matchResult = regex.find(packet)
+					return matchResult?.groups?.get(1)?.value
+				}
+
+				// Extract parsedTocall from the packet
+				val parsedTocall = extractParsedTocall(packet)
+
+				// If parsedTocall is found, process it
+				val model = if (parsedTocall != null) {
+					// Try processTocall with parsedTocall
+					var result: String? = AprsPacket.processTocall(parsedTocall)
+
+					// If no match found with processTocall, try micetocall with last 2 characters of comment
+					if (result == null) {
+						result = AprsPacket.micetocall(comment.takeLast(2))
+					}
+
+					// If neither processTocall nor micetocall found a match, return parsedTocall
+					result ?: parsedTocall
+				} else {
+					// If no parsedTocall found, return null
+					null
+				}
+
+				// Update the TextView with the model (to call) if there's a match
+				toCallText.text = model ?: ""
+
 
                 // Reset timestamp to current time and start incrementing
                 lastReceivedTimestamp = System.currentTimeMillis()
                 incrementingTimestamp = 0 // Reset incremented timestamp
-            }
-        }
-    }
-
-    // Receiver for updates from APRSReceiver (custom broadcast)
-    private val updateReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            Log.d("MainActivity", "onReceive triggered in updateReceiver with intent: $intent")
-
-            // Get the data from the broadcasted intent
-            val positionUpdate = intent?.getStringExtra("POSITION_UPDATE")
-            if (positionUpdate != null) {
-                // Update the UI with the received data
-                sourceText.text = "Source: $positionUpdate"
-                locationText.text = "Location: $positionUpdate"
-                callsignText.text = "Callsign: $positionUpdate"
-                packetText.text = "Packet: $positionUpdate"
-
-                // Reset timestamp to current time and start incrementing
-                lastReceivedTimestamp = System.currentTimeMillis()
-                incrementingTimestamp = 0 // Reset incremented timestamp
-
-                Log.d("MainActivity", "Received position update from APRSReceiver: $positionUpdate")
-            } else {
-                // If no data is received, show fallback message
-                sourceText.text = "Source: No data"
-                locationText.text = "Location: No data"
-                callsignText.text = "Callsign: No data"
-                packetText.text = "Packet: No data"
-                Log.d("MainActivity", "Position update from APRSReceiver was null")
             }
         }
     }
@@ -142,6 +159,8 @@ class MainActivity : AppCompatActivity() {
         symbolText = findViewById(R.id.symbolText)
         speedText = findViewById(R.id.speedText)  // Add speedText initialization
         courseText = findViewById(R.id.courseText)  // Add courseText initialization
+        currentTimeText = findViewById(R.id.currentTimeText)  // Initialize TextView
+        toCallText = findViewById(R.id.toCallText)  // Initialize the "To Call" TextView
 
         // Log when onCreate is triggered
         Log.d("MainActivity", "onCreate called")
@@ -166,15 +185,6 @@ class MainActivity : AppCompatActivity() {
         }
         Log.d("MainActivity", "APRSdroidReceiver registered for POSITION action")
 
-        val updateFilter = IntentFilter("com.na7q.hud.POSITION_UPDATE")
-        if (Build.VERSION.SDK_INT >= 34 && applicationInfo.targetSdkVersion >= 34) {
-            // Register with the export flag for SDK 34+
-            registerReceiver(updateReceiver, updateFilter, Context.RECEIVER_EXPORTED)
-        } else {
-            registerReceiver(updateReceiver, updateFilter)
-        }
-        Log.d("MainActivity", "UpdateReceiver registered for POSITION_UPDATE action")
-
         // Start the Runnable to update the timestamp
         updateHandler.post(timestampRunnable)
     }
@@ -183,7 +193,6 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
         // Unregister both receivers to avoid memory leaks when the activity is destroyed
         unregisterReceiver(aprsDroidReceiver)
-        unregisterReceiver(updateReceiver)
         Log.d("MainActivity", "Receivers unregistered")
 
         // Stop the timestamp updates when the activity is destroyed
