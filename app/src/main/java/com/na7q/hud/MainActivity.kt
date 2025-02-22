@@ -27,9 +27,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var speedText: TextView
     private lateinit var courseText: TextView
     private lateinit var symbolText: TextView
-	private lateinit var toCallText: TextView  // New TextView for "To Call"
-
-	private lateinit var currentTimeText: TextView  // New TextView for system time
+    private lateinit var toCallText: TextView  // New TextView for "To Call"
+    private lateinit var currentTimeText: TextView  // New TextView for system time
 
     private var lastReceivedTimestamp: Long = 0
     private var incrementingTimestamp: Long = 0
@@ -37,25 +36,26 @@ class MainActivity : AppCompatActivity() {
     private val updateHandler = Handler(Looper.getMainLooper())
 
     // Runnable to update the timestamp every second (in milliseconds)
-	private val timestampRunnable = object : Runnable {
-		override fun run() {
-			if (lastReceivedTimestamp > 0) {
-				// Increment timestamp
-				incrementingTimestamp = System.currentTimeMillis() - lastReceivedTimestamp
-				val seconds = incrementingTimestamp / 1000 // Convert to seconds
-				val formattedTime = String.format("%02d:%02d:%02d", seconds / 3600, (seconds % 3600) / 60, seconds % 60)
-				
-				// Get current system time
-				val currentTime = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
+    private val timestampRunnable = object : Runnable {
+        override fun run() {
+            // Update the current system time every second
+            val currentTime = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
+            currentTimeText.text = "Time: $currentTime" // Update the current system time
 
-				// Update TextView with last heard and current time
-				timestampText.text = "Last Heard: $formattedTime"
-				currentTimeText.text = "Time: $currentTime"
-				
-			}
-			updateHandler.postDelayed(this, 1000) // Update every second
-		}
-	}
+            if (lastReceivedTimestamp > 0) {
+                // Increment timestamp
+                incrementingTimestamp = System.currentTimeMillis() - lastReceivedTimestamp
+                val seconds = incrementingTimestamp / 1000 // Convert to seconds
+                val formattedTime = String.format("%02d:%02d:%02d", seconds / 3600, (seconds % 3600) / 60, seconds % 60)
+
+                // Update TextView with last heard timestamp
+                timestampText.text = "Last Heard: $formattedTime"
+            }
+
+            updateHandler.postDelayed(this, 1000) // Update every second
+        }
+    }
+
 
 
     // Receiver for updates from APRSdroid
@@ -105,37 +105,37 @@ class MainActivity : AppCompatActivity() {
                 // Display the speed and course as integers
                 speedText.text = "Speed: $speed mph"  // Show speed as an integer (in km/h or desired unit)
                 courseText.text = "Course: $course°"  // Show course as an integer (in degrees)
-				
-				// Function to extract parsedTocall from the packet
-				fun extractParsedTocall(packet: String): String? {
-					// Regular expression to match text between '>' and first ',' or ';'
-					val regex = ">([^,:]+)".toRegex()
-					val matchResult = regex.find(packet)
-					return matchResult?.groups?.get(1)?.value
-				}
 
-				// Extract parsedTocall from the packet
-				val parsedTocall = extractParsedTocall(packet)
+                // Function to extract parsedTocall from the packet
+                fun extractParsedTocall(packet: String): String? {
+                    // Regular expression to match text between '>' and first ',' or ';'
+                    val regex = ">([^,:]+)".toRegex()
+                    val matchResult = regex.find(packet)
+                    return matchResult?.groups?.get(1)?.value
+                }
 
-				// If parsedTocall is found, process it
-				val model = if (parsedTocall != null) {
-					// Try processTocall with parsedTocall
-					var result: String? = AprsPacket.processTocall(parsedTocall)
+                // Extract parsedTocall from the packet
+                val parsedTocall = extractParsedTocall(packet)
 
-					// If no match found with processTocall, try micetocall with last 2 characters of comment
-					if (result == null) {
-						result = AprsPacket.micetocall(comment.takeLast(2))
-					}
+                // If parsedTocall is found, process it
+                val model = if (parsedTocall != null) {
+                    // Try processTocall with parsedTocall
+                    var result: String? = AprsPacket.processTocall(parsedTocall)
 
-					// If neither processTocall nor micetocall found a match, return parsedTocall
-					result ?: parsedTocall
-				} else {
-					// If no parsedTocall found, return null
-					null
-				}
+                    // If no match found with processTocall, try micetocall with last 2 characters of comment
+                    if (result == null) {
+                        result = AprsPacket.micetocall(comment.takeLast(2))
+                    }
 
-				// Update the TextView with the model (to call) if there's a match
-				toCallText.text = model ?: ""
+                    // If neither processTocall nor micetocall found a match, return parsedTocall
+                    result ?: parsedTocall
+                } else {
+                    // If no parsedTocall found, return null
+                    null
+                }
+
+                // Update the TextView with the model (to call) if there's a match
+                toCallText.text = model ?: ""
 
 
                 // Reset timestamp to current time and start incrementing
@@ -187,6 +187,33 @@ class MainActivity : AppCompatActivity() {
 
         // Start the Runnable to update the timestamp
         updateHandler.post(timestampRunnable)
+    }
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putLong("lastReceivedTimestamp", lastReceivedTimestamp)
+        outState.putString("source", sourceText.text.toString())
+        outState.putString("location", locationText.text.toString())
+        outState.putString("callsign", callsignText.text.toString())
+        outState.putString("packet", packetText.text.toString())
+        outState.putString("comment", commentText.text.toString())
+        outState.putString("symbol", symbolText.text.toString())
+        outState.putString("speed", speedText.text.toString())
+        outState.putString("course", courseText.text.toString())
+        outState.putString("toCall", toCallText.text.toString())
+    }
+
+    override fun onRestoreInstanceState(savedInstanceState: Bundle) {
+        super.onRestoreInstanceState(savedInstanceState)
+        lastReceivedTimestamp = savedInstanceState.getLong("lastReceivedTimestamp", 0)
+        sourceText.text = savedInstanceState.getString("source", "N/A")
+        locationText.text = savedInstanceState.getString("location", "N/A")
+        callsignText.text = savedInstanceState.getString("callsign", "N/A")
+        packetText.text = savedInstanceState.getString("packet", "N/A")
+        commentText.text = savedInstanceState.getString("comment", "N/A")
+        symbolText.text = savedInstanceState.getString("symbol", "N/A")
+        speedText.text = savedInstanceState.getString("speed", "Speed: 0 mph")
+        courseText.text = savedInstanceState.getString("course", "Course: 0°")
+        toCallText.text = savedInstanceState.getString("toCall", "")
     }
 
     override fun onDestroy() {
