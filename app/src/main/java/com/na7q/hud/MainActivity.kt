@@ -4,43 +4,31 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.location.Location
 import android.os.Bundle
-import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
-import android.util.Log
-import android.view.View
 import android.os.Handler
 import android.os.Looper
 import android.os.Build
+import android.util.Log
+import android.view.View
+import androidx.appcompat.app.AppCompatActivity
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
-    private lateinit var sourceText: TextView
-    private lateinit var locationText: TextView
-    private lateinit var callsignText: TextView
-    private lateinit var packetText: TextView
-    private lateinit var timestampText: TextView
-    private lateinit var commentText: TextView
-    private lateinit var speedText: TextView
-    private lateinit var courseText: TextView
-    private lateinit var symbolText: TextView
-    private lateinit var toCallText: TextView  // New TextView for "To Call"
-    private lateinit var currentTimeText: TextView  // New TextView for system time
+    private lateinit var hudDisplay: HudDisplay
 
     private var lastReceivedTimestamp: Long = 0
     private var incrementingTimestamp: Long = 0
 
     private val updateHandler = Handler(Looper.getMainLooper())
 
-    // Runnable to update the timestamp every second (in milliseconds)
+    // Runnable to update the timestamp every second
     private val timestampRunnable = object : Runnable {
         override fun run() {
             // Update the current system time every second
             val currentTime = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
-            currentTimeText.text = "Time: $currentTime" // Update the current system time
+            hudDisplay.updateCurrentTime(currentTime)  // Update the system time
 
             if (lastReceivedTimestamp > 0) {
                 // Increment timestamp
@@ -48,119 +36,20 @@ class MainActivity : AppCompatActivity() {
                 val seconds = incrementingTimestamp / 1000 // Convert to seconds
                 val formattedTime = String.format("%02d:%02d:%02d", seconds / 3600, (seconds % 3600) / 60, seconds % 60)
 
-                // Update TextView with last heard timestamp
-                timestampText.text = "Last Heard: $formattedTime"
+                // Update last heard timestamp
+                hudDisplay.updateTimestamp(formattedTime)
             }
 
             updateHandler.postDelayed(this, 1000) // Update every second
         }
     }
 
-
-
-    // Receiver for updates from APRSdroid
-    private val aprsDroidReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            Log.d("MainActivity", "APRSdroid receiver triggered with intent: $intent")
-
-            if (intent != null) {
-                // Log all the extras in the intent
-                val allExtras = intent.extras
-                if (allExtras != null) {
-                    for (key in allExtras.keySet()) {
-                        Log.d("MainActivity", "Extra key: $key, Value: ${allExtras[key]}")
-                    }
-                } else {
-                    Log.d("MainActivity", "No extras in intent")
-                }
-
-                // Extract values
-                val source = intent.getStringExtra("org.aprsdroid.app.SOURCE") ?: "N/A"
-                val callsign = intent.getStringExtra("org.aprsdroid.app.CALLSIGN") ?: "N/A"
-                val packet = intent.getStringExtra("org.aprsdroid.app.PACKET") ?: "N/A"
-                val symbol = intent.getStringExtra("org.aprsdroid.app.SYMBOL") ?: "N/A"
-                val comment = intent.getStringExtra("org.aprsdroid.app.COMMENT") ?: "N/A"
-
-                // Convert LAT and LON from microdegrees to degrees
-                val latMicro = intent.getIntExtra("org.aprsdroid.app.LOCATION_LAT", 0)
-                val lonMicro = intent.getIntExtra("org.aprsdroid.app.LOCATION_LON", 0)
-                val latitude = latMicro / 1_000_000.0
-                val longitude = lonMicro / 1_000_000.0
-                val location = "Lat: $latitude, Lon: $longitude"
-
-                val speed = intent.getIntExtra("org.aprsdroid.app.SPEED", 0)
-                val course = intent.getIntExtra("org.aprsdroid.app.COURSE", 0)
-
-                // Log the received data
-                Log.d("MainActivity", "Received data: source=$source, location=$location, callsign=$callsign, packet=$packet")
-
-                // Update the TextViews with all the received data
-                sourceText.text = "$source"
-                locationText.text = "$location"
-                callsignText.text = "$callsign"
-                packetText.text = "$packet"
-                commentText.text = "$comment"
-                symbolText.text = "$symbol"  // Add symbol if desired
-
-                // Display the speed and course as integers
-                speedText.text = "Speed: $speed mph"  // Show speed as an integer (in km/h or desired unit)
-                courseText.text = "Course: $course°"  // Show course as an integer (in degrees)
-
-                // Function to extract parsedTocall from the packet
-                fun extractParsedTocall(packet: String): String? {
-                    // Regular expression to match text between '>' and first ',' or ';'
-                    val regex = ">([^,:]+)".toRegex()
-                    val matchResult = regex.find(packet)
-                    return matchResult?.groups?.get(1)?.value
-                }
-
-                // Extract parsedTocall from the packet
-                val parsedTocall = extractParsedTocall(packet)
-
-                // If parsedTocall is found, process it
-                val model = if (parsedTocall != null) {
-                    // Try processTocall with parsedTocall
-                    var result: String? = AprsPacket.processTocall(parsedTocall)
-
-                    // If no match found with processTocall, try micetocall with last 2 characters of comment
-                    if (result == null) {
-                        result = AprsPacket.micetocall(comment.takeLast(2))
-                    }
-
-                    // If neither processTocall nor micetocall found a match, return parsedTocall
-                    result ?: parsedTocall
-                } else {
-                    // If no parsedTocall found, return null
-                    null
-                }
-
-                // Update the TextView with the model (to call) if there's a match
-                toCallText.text = model ?: ""
-
-
-                // Reset timestamp to current time and start incrementing
-                lastReceivedTimestamp = System.currentTimeMillis()
-                incrementingTimestamp = 0 // Reset incremented timestamp
-            }
-        }
-    }
+    // APRS receiver instance
+    private lateinit var aprsReceiver: AprsReceiver
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-
-        // Initialize the TextViews
-        sourceText = findViewById(R.id.sourceText)
-        locationText = findViewById(R.id.locationText)
-        callsignText = findViewById(R.id.callsignText)
-        packetText = findViewById(R.id.packetText)
-        timestampText = findViewById(R.id.timestampText)
-        commentText = findViewById(R.id.commentText)
-        symbolText = findViewById(R.id.symbolText)
-        speedText = findViewById(R.id.speedText)  // Add speedText initialization
-        courseText = findViewById(R.id.courseText)  // Add courseText initialization
-        currentTimeText = findViewById(R.id.currentTimeText)  // Initialize TextView
-        toCallText = findViewById(R.id.toCallText)  // Initialize the "To Call" TextView
 
         // Log when onCreate is triggered
         Log.d("MainActivity", "onCreate called")
@@ -175,54 +64,60 @@ class MainActivity : AppCompatActivity() {
         // Keep the screen on while the app is open
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
-        // Register receivers for both actions, with version check
+
+        // Initialize the HudDisplay class with the TextViews
+        hudDisplay = HudDisplay(
+            findViewById(R.id.sourceText),
+            findViewById(R.id.locationText),
+            findViewById(R.id.callsignText),
+            findViewById(R.id.packetText),
+            findViewById(R.id.timestampText),
+            findViewById(R.id.commentText),
+            findViewById(R.id.symbolText),
+            findViewById(R.id.speedText),
+            findViewById(R.id.courseText),
+            findViewById(R.id.toCallText),
+            findViewById(R.id.currentTimeText)
+        )
+
+        // Register the APRSdroid receiver using AprsReceiver
+        aprsReceiver = AprsReceiver { source, location, callsign, packet, comment, symbol, speed, course, model ->
+            // Update the HUD with the received data
+            hudDisplay.updateHud(source, location, callsign, packet, comment, symbol, speed, course, model)
+            
+            // Reset timestamp to current time and start incrementing
+            lastReceivedTimestamp = System.currentTimeMillis()
+            incrementingTimestamp = 0
+        }
+
         val aprsDroidFilter = IntentFilter("org.aprsdroid.app.HUD")
         if (Build.VERSION.SDK_INT >= 34 && applicationInfo.targetSdkVersion >= 34) {
-            // Register with the export flag for SDK 34+
-            registerReceiver(aprsDroidReceiver, aprsDroidFilter, Context.RECEIVER_EXPORTED)
+            registerReceiver(aprsReceiver, aprsDroidFilter, Context.RECEIVER_EXPORTED)
         } else {
-            registerReceiver(aprsDroidReceiver, aprsDroidFilter)
+            registerReceiver(aprsReceiver, aprsDroidFilter)
         }
-        Log.d("MainActivity", "APRSdroidReceiver registered for POSITION action")
 
         // Start the Runnable to update the timestamp
         updateHandler.post(timestampRunnable)
-    }
-    override fun onSaveInstanceState(outState: Bundle) {
-        super.onSaveInstanceState(outState)
-        outState.putLong("lastReceivedTimestamp", lastReceivedTimestamp)
-        outState.putString("source", sourceText.text.toString())
-        outState.putString("location", locationText.text.toString())
-        outState.putString("callsign", callsignText.text.toString())
-        outState.putString("packet", packetText.text.toString())
-        outState.putString("comment", commentText.text.toString())
-        outState.putString("symbol", symbolText.text.toString())
-        outState.putString("speed", speedText.text.toString())
-        outState.putString("course", courseText.text.toString())
-        outState.putString("toCall", toCallText.text.toString())
+
+        // Restore saved instance state if available
+        savedInstanceState?.let {
+            hudDisplay.restoreInstanceState(it)
+            lastReceivedTimestamp = it.getLong("lastReceivedTimestamp", 0)
+        }
     }
 
-    override fun onRestoreInstanceState(savedInstanceState: Bundle) {
-        super.onRestoreInstanceState(savedInstanceState)
-        lastReceivedTimestamp = savedInstanceState.getLong("lastReceivedTimestamp", 0)
-        sourceText.text = savedInstanceState.getString("source", "N/A")
-        locationText.text = savedInstanceState.getString("location", "N/A")
-        callsignText.text = savedInstanceState.getString("callsign", "N/A")
-        packetText.text = savedInstanceState.getString("packet", "N/A")
-        commentText.text = savedInstanceState.getString("comment", "N/A")
-        symbolText.text = savedInstanceState.getString("symbol", "N/A")
-        speedText.text = savedInstanceState.getString("speed", "Speed: 0 mph")
-        courseText.text = savedInstanceState.getString("course", "Course: 0°")
-        toCallText.text = savedInstanceState.getString("toCall", "")
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        // Save the instance state using HudDisplay's method
+        hudDisplay.saveInstanceState(outState)
+        outState.putLong("lastReceivedTimestamp", lastReceivedTimestamp)
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        // Unregister both receivers to avoid memory leaks when the activity is destroyed
-        unregisterReceiver(aprsDroidReceiver)
-        Log.d("MainActivity", "Receivers unregistered")
-
-        // Stop the timestamp updates when the activity is destroyed
+        // Unregister the receiver to avoid memory leaks
+        unregisterReceiver(aprsReceiver)
         updateHandler.removeCallbacks(timestampRunnable)
     }
 }
