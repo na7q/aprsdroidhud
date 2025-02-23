@@ -1,12 +1,140 @@
 <androidx.constraintlayout.widget.ConstraintLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:padding="0dp"
-    tools:context=".MainActivity">
+	xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:app="http://schemas.android.com/apk/res-auto"
+	xmlns:tools="http://schemas.android.com/tools"
+	android:layout_width="match_parent"
+	android:layout_height="match_parent"
+	android:padding="0dp"
+	tools:context=".MainActivity">
 
+
+	<!-- SymbolView to the far left -->
+	<com.na7q.hud.SymbolView
+		android:id="@+id/symbolImageView"
+		android:layout_width="100dp"
+		android:layout_height="100dp"
+		android:layout_marginTop="15dp"
+		app:layout_constraintStart_toStartOf="parent"
+		app:layout_constraintTop_toTopOf="@id/callsignText"
+		app:layout_constraintHorizontal_bias="0.0" />
+
+	<!-- Display Callsign to the right of SymbolView -->
+	<TextView
+		android:id="@+id/callsignText"
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:layout_marginTop="12dp"
+		android:paddingBottom="2dp"
+		android:textSize="100sp"
+		app:layout_constraintStart_toEndOf="@id/symbolImageView"
+		app:layout_constraintTop_toTopOf="parent"
+		app:layout_constraintEnd_toEndOf="parent"
+		app:layout_constraintHorizontal_bias="0.0" />
+
+	<!-- Divider Below toCallText -->
+	<View
+		android:id="@+id/toCallDivider"
+		android:layout_width="0dp"
+		android:layout_height="2dp"
+		android:background="@android:color/darker_gray"
+		app:layout_constraintStart_toStartOf="parent"
+		app:layout_constraintEnd_toEndOf="parent"
+		app:layout_constraintTop_toBottomOf="@id/callsignText"
+		android:layout_marginTop="14dp"/>
+
+	<!-- Display QRG (To the right of Current Time) -->
+	<TextView
+		android:id="@+id/qrgText"
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:textSize="20sp"
+		android:text=""
+		android:layout_marginStart="2dp"
+		android:layout_marginEnd="8dp"
+		app:layout_constraintStart_toEndOf="@id/currentTimeText"
+		app:layout_constraintTop_toTopOf="@id/currentTimeText"
+		app:layout_constraintBottom_toBottomOf="@id/currentTimeText"
+		app:layout_constraintEnd_toEndOf="parent"
+		app:layout_constraintHorizontal_bias="0.95"/>
+
+
+	<View
+		android:id="@+id/headerDivider"
+		android:layout_width="0dp"
+		android:layout_height="2dp"
+		android:background="@android:color/darker_gray"
+		app:layout_constraintStart_toStartOf="parent"
+		app:layout_constraintEnd_toEndOf="parent"
+		app:layout_constraintTop_toBottomOf="@id/currentTimeText"
+		app:layout_constraintHorizontal_bias="0.0"/>
+
+	<!-- Display Source (Below Callsign) -->
+	<TextView
+		android:id="@+id/sourceText"
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:paddingBottom="2dp"
+		android:textSize="20sp"
+		android:layout_marginTop="4dp"
+		android:layout_marginLeft="10dp"
+		android:paddingLeft="8dp"
+		app:layout_constraintTop_toBottomOf="@id/toCallDivider" />
+
+	<!-- Display Location (Below Source) -->
+	<TextView
+		android:id="@+id/locationText"
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:paddingBottom="2dp"
+		android:textSize="20sp"
+		android:layout_marginTop="4dp"
+		android:layout_marginLeft="10dp"
+		android:paddingLeft="8dp"
+		app:layout_constraintTop_toBottomOf="@id/sourceText" />
+
+	<!-- Display Comment (Below Location) -->
+	<TextView
+		android:id="@+id/commentText"
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:textSize="20sp"
+		android:layout_marginTop="4dp"
+		android:layout_marginLeft="10dp"
+		android:paddingLeft="8dp"
+
+		app:layout_constraintTop_toBottomOf="@id/locationText" />
+
+	<!-- Display Symbol (Below Comment) -->
+	<TextView
+		android:id="@+id/symbolText"
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:textSize="20sp"
+		android:layout_marginTop="4dp"
+		android:layout_marginLeft="10dp"
+		android:paddingLeft="8dp"
+		app:layout_constraintTop_toBottomOf="@id/commentText" />
+
+	<!-- Display Symbol (Below Comment) -->
+	<TextView
+		android:id="@+id/toCallText"
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:textSize="20sp"
+		android:layout_marginTop="4dp"
+		android:layout_marginLeft="10dp"
+		android:paddingLeft="8dp"
+		app:layout_constraintTop_toBottomOf="@id/symbolImageView" />
+
+	<!-- Display Timestamp (Independent at the top left) -->
+	<TextView
+		android:id="@+id/timestampText"
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:textSize="18sp"
+		android:layout_marginTop="10dp"
+		android:layout_marginLeft="10dp"
+		android:paddingLeft="8dp" />
 	<!-- Display Current Time (Centered at the Top) -->
 	<TextView
 		android:id="@+id/currentTimeText"
@@ -20,133 +148,50 @@
 		app:layout_constraintEnd_toEndOf="parent"
 		app:layout_constraintHorizontal_bias="0.5"/>
 
-    <!-- Display Callsign (At the top) -->
-    <TextView
-        android:id="@+id/callsignText"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:paddingBottom="2dp"
-        android:textSize="80sp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.0"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
 
-    <!-- Display Source (Below Callsign) -->
-    <TextView
-        android:id="@+id/sourceText"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="2dp"
-        android:paddingBottom="2dp"
-        android:text="Source: N/A"
-        android:textSize="18sp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.0"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/callsignText" />
+	<!-- Display Speed (Below the Divider, Right-Aligned) -->
+	<TextView
+		android:id="@+id/speedText"
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:textSize="16sp"
+		app:layout_constraintEnd_toEndOf="parent"
+		app:layout_constraintTop_toBottomOf="@id/headerDivider"
+		android:layout_marginTop="8dp"
+		android:layout_marginEnd="16dp" />
 
-    <!-- Display Location (Below Source) -->
-    <TextView
-        android:id="@+id/locationText"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:paddingBottom="2dp"
-        android:text="Location: N/A"
-        android:textSize="18sp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.0"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/sourceText" />
+	<!-- Display Course (Below Speed, Right-Aligned) -->
+	<TextView
+		android:id="@+id/courseText"
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:textSize="16sp"
+		app:layout_constraintEnd_toEndOf="parent"
+		app:layout_constraintTop_toBottomOf="@id/speedText"
+		android:layout_marginTop="4dp"
+		android:layout_marginEnd="16dp" />
 
-    <!-- Display Comment (Below Location) -->
-    <TextView
-        android:id="@+id/commentText"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Comment: N/A"
-        android:textSize="16sp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.0"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/locationText" />
-
-    <!-- Display Symbol (Below Comment) -->
-    <TextView
-        android:id="@+id/symbolText"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:textSize="16sp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.0"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/commentText" />
-
-    <!-- Display Symbol (Below Comment) -->
-    <TextView
-        android:id="@+id/toCallText"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:textSize="16sp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.0"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/symbolText" />
-		
-    <!-- Display Timestamp (Independent at the top left) -->
-    <TextView
-        android:id="@+id/timestampText"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:textSize="16sp"
-        android:layout_marginTop="10dp"
-        android:layout_marginLeft="10dp"
-        android:paddingLeft="8dp" />
-
-    <!-- Display Speed (To the right of Timestamp) -->
-    <TextView
-        android:id="@+id/speedText"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:textSize="16sp"
-        app:layout_constraintStart_toEndOf="@id/timestampText"
-        app:layout_constraintTop_toTopOf="@id/timestampText"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="1.0"
-        android:layout_marginEnd="16dp" />
-
-    <!-- Display Course (Below Speed) -->
-    <TextView
-        android:id="@+id/courseText"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:textSize="16sp"
-        app:layout_constraintStart_toEndOf="@id/speedText"
-        app:layout_constraintTop_toBottomOf="@id/speedText"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="1.0"
-        android:layout_marginEnd="16dp" />
-
-    <!-- Display Packet Data (At the bottom) -->
-    <TextView
-        android:id="@+id/packetText"
-        android:layout_width="match_parent"
-        android:layout_height="90dp"
-        android:background="@drawable/white_border"
-        android:ellipsize="end"
-        android:gravity="top"
-        android:maxLines="3"
-        android:paddingLeft="16dp"
-        android:paddingTop="10dp"
-        android:paddingRight="16dp"
-        android:paddingBottom="10dp"
-        android:text="Waiting for data..."
-        android:textSize="18sp"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.0"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/commentText"
-        app:layout_constraintVertical_bias="0.918" />
+	<!-- Display Packet Data (At the bottom) -->
+	<TextView
+		android:id="@+id/packetText"
+		android:layout_width="match_parent"
+		android:layout_height="90dp"
+		android:background="@drawable/white_border"
+		android:layout_marginEnd="2dp"
+		android:ellipsize="end"
+		android:gravity="top"
+		android:maxLines="3"
+		android:paddingLeft="16dp"
+		android:paddingTop="10dp"
+		android:paddingRight="16dp"
+		android:paddingBottom="10dp"
+		android:text="Waiting for data..."
+		android:textSize="18sp"
+		app:layout_constraintBottom_toBottomOf="parent"
+		app:layout_constraintEnd_toEndOf="parent"
+		app:layout_constraintHorizontal_bias="0.0"
+		app:layout_constraintStart_toStartOf="parent"
+		app:layout_constraintTop_toBottomOf="@id/commentText"
+		app:layout_constraintVertical_bias="0.718" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
