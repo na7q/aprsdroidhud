@@ -10,16 +10,30 @@ import android.util.AttributeSet
 import android.widget.ImageView
 
 class SymbolView(context: Context, attrs: AttributeSet) : ImageView(context, attrs) {
-
+    // Use the preloaded bitmap from MainActivity
     private val iconBitmap: Bitmap by lazy {
-        BitmapFactory.decodeResource(resources, R.drawable.allicons) // Load the allicons.png image
+        MainActivity.iconBitmap // Access the preloaded bitmap
     }
+    //private val iconBitmap: Bitmap by lazy {
+     //   BitmapFactory.decodeResource(resources, R.drawable.allicons) // Load the allicons.png image
+    //}
 
     // This method will be called to update the symbol image
-    fun setSymbol(symbol: String) {
-        val symbolBitmap = getSymbolBitmap(symbol) // Get the symbol image part from allicons.png
-        setImageBitmap(symbolBitmap) // Update the ImageView with the symbol image
-    }
+    
+	//fun setSymbol(symbol: String) {
+    //    val symbolBitmap = getSymbolBitmap(symbol) // Get the symbol image part from allicons.png
+    //    setImageBitmap(symbolBitmap) // Update the ImageView with the symbol image
+    //}
+	
+	fun setSymbol(symbol: String) {
+		if (symbol.isEmpty()) {
+			setImageDrawable(null) // Clears the image instead of rendering a symbol
+			return
+		}
+
+		val symbolBitmap = getSymbolBitmap(symbol) // Get the symbol image part from allicons.png
+		setImageBitmap(symbolBitmap) // Update the ImageView with the symbol image
+	}
 
     // Method to extract the correct symbol from the allicons.png image
     private fun getSymbolBitmap(symbol: String): Bitmap {

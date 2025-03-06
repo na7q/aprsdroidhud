@@ -6,11 +6,12 @@ data class AprsPacket(
     companion object {
 	
 		private val KENWOOD_COMMENT_DATA = mapOf(
-					"" to mapOf("vendor" to "Kenwood", "model" to "TH-D7A", "class" to "ht"),
+					">" to mapOf("vendor" to "Kenwood", "model" to "TH-D7A", "class" to "ht"),
 					"=" to mapOf("vendor" to "Kenwood", "model" to "TH-D72", "class" to "ht"),
 					"^" to mapOf("vendor" to "Kenwood", "model" to "TH-D74", "class" to "ht"),
 					"&" to mapOf("vendor" to "Kenwood", "model" to "TH-D75", "class" to "ht"),
-					"=" to mapOf("vendor" to "Kenwood", "model" to "TM-D710", "class" to "rig")
+					"=" to mapOf("vendor" to "Kenwood", "model" to "TM-D710", "class" to "rig"),
+					"]" to mapOf("vendor" to "Kenwood", "model" to "TM-D700", "class" to "rig")					
 		)	
 		
 		private val COMMENT_DATA = mapOf(
@@ -222,7 +223,7 @@ data class AprsPacket(
 					"APNX??" to mapOf("vendor" to "K6DBG", "model" to "TNC-X"),
 					"APOA??" to mapOf("vendor" to "OpenAPRS", "model" to "app", "class" to "app"),
 					"APOCSG" to mapOf("vendor" to "N0AGI", "model" to "POCSAG"),
-					"APODOT" to mapOf("vendor" to "Mike, NA7Q", "model" to "Oregon Department of Transportion Traffic Alerts", "class" to "service"),
+					"APODOT" to mapOf("vendor" to "Mike, NA7Q", "model" to "ODOT Traffic Alerts", "class" to "service"),
 					"APOG7?" to mapOf("vendor" to "OpenGD77", "model" to "OpenGD77"),
 					"APOLU?" to mapOf("vendor" to "AMSAT-LU", "model" to "Oscar", "class" to "satellite"),
 					"APOPYT" to mapOf("vendor" to "Mike, NA7Q", "model" to "NA7Q Messenger", "class" to "software"),
@@ -334,6 +335,8 @@ data class AprsPacket(
 					"APZWKR" to mapOf("vendor" to "GM1WKR", "model" to "NetSked", "class" to "software"),
 					"AP???D" to mapOf("vendor" to "Painter Engineering", "model" to "uSmartDigi D-Gate", "class" to "dstar"),
 					"AP???U" to mapOf("vendor" to "Painter Engineering", "model" to "uSmartDigi Digipeater", "class" to "digi"),
+					"BEACON" to mapOf("vendor" to "Unknown", "model" to "BEACON"),	
+					"ID" to mapOf("vendor" to "Unknown", "model" to "ID"),					
 					"PSKAPR" to mapOf("vendor" to "Open Source", "model" to "PSKmail", "class" to "software")
 		)
 									
@@ -372,5 +375,165 @@ data class AprsPacket(
             return KENWOOD_COMMENT_DATA[lastChar]?.get("model")
         }
 		
-    }
+		fun oldkenwoodtocall(packet: String): String? {
+			val colonIndex = packet.indexOf(':')
+			if (colonIndex == -1 || colonIndex + 10 >= packet.length) {
+				return null
+			}
+
+			return if (packet[colonIndex + 1] == '\'') {
+				val keyChar = packet[colonIndex + 10]
+				KENWOOD_COMMENT_DATA[keyChar.toString()]?.get("model")
+			} else {
+				null
+			}
+		}
+		
+		// Function to get packet type based on the type character from the packet
+		fun getPacketType(packet: String): String {
+			// Get the character after ':' (if exists), otherwise return "Other"
+			val typeChar = packet.split(":").getOrNull(1)?.firstOrNull()
+
+			// If no character after ':', return "Other"
+			return when (typeChar) {
+				'!', '=', '/', '@', '\'', '`' -> "Position"  // Includes Old Mic-E Data (TM-D700)
+				'T' -> "Telemetry"
+				'>' -> "Status"
+				'?' -> "Query"
+				';' -> "Object"
+				':' -> "Message"
+				'_' -> "Weather Report (No Position)"
+				'$' -> "Raw GPS Data"
+				'}' -> "Third-Party Traffic"
+				else -> "Other"  // For any other cases, default to "Other"
+			}
+		}
+
+		// Helper function to handle Status type and extract the comment
+		fun handleStatus(packet: String): String {
+			// Extract the content after the first ">" if it exists
+			val regex = "^(?:[^>]*>){2}(.*)".toRegex()
+			val matchResult = regex.find(packet)
+			
+			// Return the extracted content or the existing comment if no content is found
+			return matchResult?.groups?.get(1)?.value ?: ""
+		}
+
+		fun handleTelemetry(packet: String): String {
+			// Extract telemetry data from the packet
+			// Example: Process telemetry values, strip unnecessary data, etc.
+			return packet.substringAfter(":").trim()  // Example: Extract everything after ":"
+		}
+		
+		// Function to split the packet at the first ">" and return the part after it
+		fun getSource(packet: String): String? {
+			return packet.split(">").getOrNull(0)?.trim()
+		}
+
+		fun handleOther(packet: String): String {
+			// Extracts the comment/data from "Other" packets
+			// If the packet contains a colon ":", extract everything after it.
+			return packet.substringAfter(":", "").trim()  // Default to empty if no colon is found
+		}
+
+		fun parseComment(comment: String): String {
+			var modifiedComment = comment
+
+			// Step 1: Check if it ends with micetocall characters (last 2 characters)
+			if (modifiedComment.length >= 2 && AprsPacket.micetocall(modifiedComment.takeLast(2)) != null) {
+				return modifiedComment.dropLast(2)  // Strip last 2 characters and return immediately
+			}
+
+			// Step 2: Check if it ends with kenwoodtocall (last 1 character)
+			if (modifiedComment.isNotEmpty() && AprsPacket.kenwoodtocall(modifiedComment.takeLast(1)) != null) {
+				modifiedComment = modifiedComment.dropLast(1)  // Strip last 1 character
+			}
+
+			// Step 3: Remove up to 3 characters before and including `}` if it appears in the first 4 characters
+			//val bracketIndex = modifiedComment.indexOf("}")
+			//if (bracketIndex in 0..3) {
+			//	val removeIndex = maxOf(0, bracketIndex - 3)  // Ensure we don't go negative
+			//	modifiedComment = modifiedComment.removeRange(removeIndex..bracketIndex).trim()
+			//}
+
+			// Step 3: Remove `}` and everything before it if it appears within the first 4 characters
+			val bracketIndex = modifiedComment.indexOf("}")
+			if (bracketIndex in 0..3) {
+				modifiedComment = modifiedComment.substring(bracketIndex + 1).trim()
+			}
+
+			// Step 3: Remove specific prefixes ("PHGxxxx", "RNGxxxx", "DFSxxxx")
+			//val prefixPatterns = listOf("^PHG\\d{4}", "^RNG\\d{4}", "^DFS\\d{4}")		
+			val prefixPatterns = listOf(
+				"PHG\\d{4}/?",  // Matches PHG followed by exactly 4 digits, with an optional trailing slash
+				"RNG\\d{4}/?",  // Matches RNG followed by exactly 4 digits, with an optional trailing slash
+				"DFS\\d{4}/?"   // Matches DFS followed by exactly 4 digits, with an optional trailing slash
+			)			
+			
+			for (pattern in prefixPatterns) {
+				modifiedComment = modifiedComment.replaceFirst(pattern.toRegex(), "").trim()
+			}
+
+			// Step 4: Remove altitude format "/A=XXXXX" where X can be positive or negative digits
+			//val altitudePattern = "/A=-?\\d{6}".toRegex()
+			val altitudePattern = "/?A=(-\\d{5}|\\d{6})".toRegex()	
+			modifiedComment = modifiedComment.replace(altitudePattern, "").trim()
+
+			// Step 5: Remove "XXX/YYY" or "XXX/YYY/A=ZZZZZ" format
+			//val coursespeedPattern = "^\\d{3}/\\d{3}(/A=-?\\d{6})?".toRegex()
+			val coursespeedPattern = "^\\d{3}/\\d{3}(/A=(-?\\d{5}|\\d{6}))?/?".toRegex()
+			
+			modifiedComment = modifiedComment.replace(coursespeedPattern, "").trim()
+
+/* 			// Step 6: Remove Weather & Telemetry Data
+			val weatherPatterns = listOf(
+				"\\.\\.\\./\\.\\.\\.",  // Matches ".../..." (Direction/Speed missing)
+				"\\.\\.\\./\\d{3}",    // Matches ".../XXX" (Speed missing)
+				"\\d{3}/\\.\\.\\.",    // Matches "XXX/..." (Direction missing)				
+				"c[\\d.]{3}",  // Course (cXXX or c...)
+				"s[\\d.]{3}",  // Speed (sXXX or s...)				
+				"g[\\d.]{3}",  // Wind Gust (gXXX or g...)				
+				"t[\\d.]{3}",  // Temperature (tXXX or t...)
+				"r[\\d.]{3}",  // Rainfall in last hour (rXXX or r...)
+				"p[\\d.]{3}",  // Rainfall in last 24 hours (pXXX or p...)
+				"P[\\d.]{3}",  // Rainfall since midnight (PXXX or P...)
+				"h[\\d.]{2,3}", // Humidity (hXX, hXXX or h..)
+				"b[\\d.]{5}",  // Barometric Pressure (bXXXXX or b.....)
+				"L[\\d.]{3}"  // Luminosity (LXXX or L...)
+				 */
+				 
+			val weatherPatterns = listOf(
+				"\\.\\.\\./\\.\\.\\.",  // Matches ".../..." (Direction/Speed missing)
+				"\\.\\.\\./\\d{3}",    // Matches ".../XXX" (Speed missing)
+				"\\d{3}/\\.\\.\\.",    // Matches "XXX/..." (Direction missing)				
+				"c\\d{3}",  // Course (cXXX)
+				"c\\.\\.\\.",  // Course missing (c...)
+				"s\\d{3}",  // Speed (sXXX)
+				"s\\.\\.\\.",  // Speed missing (s...)				
+				"g\\d{3}",  // Wind Gust (gXXX)
+				"g\\.\\.\\.",  // Wind Gust missing (g...)				
+				"t\\d{3}",  // Temperature (tXXX)
+				"t\\.\\.\\.",  // Temperature missing (t...)
+				"r\\d{3}",  // Rainfall in last hour (rXXX)
+				"r\\.\\.\\.",  // Rainfall missing (r...)
+				"p\\d{3}",  // Rainfall in last 24 hours (pXXX)
+				"p\\.\\.\\.",  // Rainfall missing (p...)
+				"P\\d{3}",  // Rainfall since midnight (PXXX)
+				"P\\.\\.\\.",  // Rainfall missing (P...)
+				"h\\d{2,3}", // Humidity (hXX or hXXX)
+				"h\\.{2,3}",  // Humidity missing (h.. or h...)
+				"b\\d{5}",  // Barometric Pressure (bXXXXX)
+				"b\\.\\.\\.\\.\\.",  // Barometric Pressure missing (b.....)
+				"L\\d{3}",  // Luminosity (LXXX)
+				"L\\.\\.\\."   // Luminosity missing (L...)
+			)
+			
+			for (pattern in weatherPatterns) {
+				modifiedComment = modifiedComment.replace(pattern.toRegex(), "").trim()
+			}
+			
+			// Return the modified comment after all transformations
+			return modifiedComment
+		}
+	}
 }

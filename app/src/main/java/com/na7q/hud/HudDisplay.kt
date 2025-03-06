@@ -18,7 +18,8 @@ class HudDisplay(
     private val courseText: TextView,
     private val toCallText: TextView,
     private val currentTimeText: TextView,
-    private val qrgText: TextView,	
+    private val qrgText: TextView,
+    private val typeText: TextView,		
     private val symbolView: SymbolView // Add the SymbolView reference
 ) {
 
@@ -33,18 +34,43 @@ class HudDisplay(
         speed: Int,
         course: Int,
         toCall: String,
-        qrg: String		
+        qrg: String,
+        type: String		
     ) {
-        sourceText.text = source
-        locationText.text = location
-        callsignText.text = callsign
+
+		// If source and callsign are the same, hide sourceText
+		if (source.isEmpty() || source == callsign) {
+			sourceText.visibility = View.GONE
+		} else {
+			sourceText.text = source
+			sourceText.visibility = View.VISIBLE
+		}
+		
+		// Handle visibility of locationText and commentText based on their content
+		if (location.isEmpty()) {
+			locationText.visibility = View.GONE
+		} else {
+			locationText.text = location
+			locationText.visibility = View.VISIBLE
+		}
+			
+		callsignText.text = callsign
         packetText.text = packet
-        commentText.text = comment
+
+		// Handle visibility of commentText based on content
+		if (comment.isEmpty()) {
+			commentText.visibility = View.GONE
+		} else {
+			commentText.text = comment
+			commentText.visibility = View.VISIBLE
+		}
+
         symbolText.text = symbol
+		symbolText.visibility = View.GONE		
 		
 		// Only display speed if it's greater than 0
 		if (speed > 0) {
-			speedText.text = "Speed: $speed mph"
+			speedText.text = "$speed mph"
 			speedText.visibility = View.VISIBLE
 		} else {
 			speedText.visibility = View.GONE
@@ -52,7 +78,7 @@ class HudDisplay(
 		
 		// Only display course if it's greater than 0
 		if (course > 0) {
-			courseText.text = "Course: $course°"
+			courseText.text = "$course°"
 			courseText.visibility = View.VISIBLE
 		} else {
 			courseText.visibility = View.GONE
@@ -60,19 +86,26 @@ class HudDisplay(
 
         toCallText.text = toCall
         qrgText.text = qrg
-        
-        // Update the symbol image in SymbolView
-        symbolView.setSymbol(symbol) // This calls the setSymbol method of SymbolView
+        typeText.text = type
+		
+		symbolView.setSymbol(symbol)		
+		
+		// Only update the symbol if it is not empty
+		//if (symbol.isNotEmpty()) {
+		//	symbolView.setSymbol(symbol)
+		//} else {
+		//	symbolView.setSymbol("") // Clear the symbol if none is provided
+		//}			
     }
 
     // Method to update the current system time in the HUD
     fun updateCurrentTime(currentTime: String) {
-        currentTimeText.text = "Time: $currentTime"
+        currentTimeText.text = "$currentTime"
     }
 
     // Method to update the last heard timestamp in the HUD
     fun updateTimestamp(formattedTime: String) {
-        timestampText.text = "Last Heard: $formattedTime"
+        timestampText.text = "$formattedTime"
     }
 
     // Save state method
@@ -87,6 +120,18 @@ class HudDisplay(
         outState.putString("course", courseText.text.toString())
         outState.putString("toCall", toCallText.text.toString())
         outState.putString("qrg", qrgText.text.toString())		
+        outState.putString("type", typeText.text.toString())	
+		
+		// Save the visibility state of the views
+		outState.putInt("sourceVisibility", sourceText.visibility)
+		outState.putInt("locationVisibility", locationText.visibility)
+		outState.putInt("commentVisibility", commentText.visibility)
+		outState.putInt("symbolVisibility", symbolText.visibility)
+		outState.putInt("speedVisibility", speedText.visibility)
+		outState.putInt("courseVisibility", courseText.visibility)
+		outState.putInt("toCallVisibility", toCallText.visibility)
+		outState.putInt("qrgVisibility", qrgText.visibility)
+		outState.putInt("typeVisibility", typeText.visibility)		
     }
 
 	fun restoreInstanceState(savedInstanceState: Bundle) {
@@ -100,6 +145,18 @@ class HudDisplay(
 		courseText.text = savedInstanceState.getString("course", "")
 		toCallText.text = savedInstanceState.getString("toCall", "")
 		qrgText.text = savedInstanceState.getString("qrg", "")
+		typeText.text = savedInstanceState.getString("type", "")
+
+		// Restore the visibility state of the views
+		sourceText.visibility = savedInstanceState.getInt("sourceVisibility", View.VISIBLE)
+		locationText.visibility = savedInstanceState.getInt("locationVisibility", View.VISIBLE)
+		commentText.visibility = savedInstanceState.getInt("commentVisibility", View.VISIBLE)
+		symbolText.visibility = savedInstanceState.getInt("symbolVisibility", View.VISIBLE)
+		speedText.visibility = savedInstanceState.getInt("speedVisibility", View.VISIBLE)
+		courseText.visibility = savedInstanceState.getInt("courseVisibility", View.VISIBLE)
+		toCallText.visibility = savedInstanceState.getInt("toCallVisibility", View.VISIBLE)
+		qrgText.visibility = savedInstanceState.getInt("qrgVisibility", View.VISIBLE)
+		typeText.visibility = savedInstanceState.getInt("typeVisibility", View.VISIBLE)
 
 		// Retrieve the symbol from savedInstanceState
 		val savedSymbol = savedInstanceState.getString("symbol", "")
