@@ -5,7 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 
-class AprsReceiver(private val updateHud: (String, String, String, String, String, String, Int, Int, String, String, String) -> Unit) : BroadcastReceiver() {
+class AprsReceiver(private val updateHud: (String, String, String, String, String, String, Int, Int, String, String, String, String) -> Unit) : BroadcastReceiver() {
     override fun onReceive(context: Context?, intent: Intent?) {
 		Log.d("AprsReceiver", "APRS receiver triggered with intent: ${intent?.action}")
 
@@ -31,13 +31,32 @@ class AprsReceiver(private val updateHud: (String, String, String, String, Strin
 			val latMicro = intent.getIntExtra("${prefix}LOCATION_LAT", 0)
 			val lonMicro = intent.getIntExtra("${prefix}LOCATION_LON", 0)
 
+			// Declare latitude and longitude before the if-else block
+			var latitude = 0.0
+			var longitude = 0.0
+
 			val location = if (latMicro != 0 && lonMicro != 0) {
-				val latitude = latMicro / 1_000_000.0
-				val longitude = lonMicro / 1_000_000.0
+				latitude = latMicro / 1_000_000.0
+				longitude = lonMicro / 1_000_000.0
 				String.format("%.4f, %.4f", latitude, longitude)
 			} else {
 				"" // Leave location empty if lat/lon are missing
 			}
+
+			val mylat = MainActivity.mylat
+			val mylon = MainActivity.mylon
+			val (distance, direction) = AprsPacket.calculateDistanceAndBearing(
+				MainActivity.mylat, MainActivity.mylon, latitude, longitude
+			)
+			
+			// Create distdir in the format: "distance mi direction"
+			val distdir = if (distance.isNotEmpty() && direction.isNotEmpty()) {
+				"$distance"+"mi"+" $direction"
+			} else {
+				"" // Empty if distance or direction is missing
+			}			
+			
+			Log.d("GPS", "Distance: $distance, Direction $direction")
 
             val speed = intent.getIntExtra("${prefix}SPEED", 0)
             val course = intent.getIntExtra("${prefix}COURSE", 0)
@@ -57,7 +76,10 @@ class AprsReceiver(private val updateHud: (String, String, String, String, Strin
 				symbol = "T&"  // Set a default symbol for "Telemetry" type		
 			} else if (type == "Other") {
 				comment = AprsPacket.handleTelemetry(packet)  //Add other once cleaned up
-				symbol = "\\&"  // Set a default symbol for "Other" type		
+				symbol = "\\&"  // Set a default symbol for "Other" type
+			} else if (type == "Message") {
+				comment = AprsPacket.handleMessages(packet)  //Add other once cleaned up
+				symbol = "M&"  // Set a default symbol for "Other" type				
 			}
 
 
@@ -87,7 +109,7 @@ class AprsReceiver(private val updateHud: (String, String, String, String, Strin
 			comment = AprsPacket.parseComment(comment)
 
             // Pass data to the MainActivity for UI update
-            updateHud(source, location, callsign, packet, comment, symbol, speed, course, model ?: "", qrg, type)
+            updateHud(source, location, callsign, packet, comment, symbol, speed, course, model ?: "", qrg, type, distdir)
         }
     }
 }

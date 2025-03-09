@@ -19,7 +19,8 @@ class HudDisplay(
     private val toCallText: TextView,
     private val currentTimeText: TextView,
     private val qrgText: TextView,
-    private val typeText: TextView,		
+    private val typeText: TextView,
+    private val distanceText: TextView,	
     private val symbolView: SymbolView // Add the SymbolView reference
 ) {
 
@@ -35,7 +36,8 @@ class HudDisplay(
         course: Int,
         toCall: String,
         qrg: String,
-        type: String		
+        type: String,
+        distance: String
     ) {
 
 		// If source and callsign are the same, hide sourceText
@@ -87,6 +89,14 @@ class HudDisplay(
         toCallText.text = toCall
         qrgText.text = qrg
         typeText.text = type
+
+		// Handle visibility of commentText based on content
+		if (distance.isEmpty()) {
+			distanceText.visibility = View.GONE
+		} else {
+			distanceText.text = distance
+			distanceText.visibility = View.VISIBLE
+		}
 		
 		symbolView.setSymbol(symbol)		
 		
@@ -121,7 +131,8 @@ class HudDisplay(
         outState.putString("toCall", toCallText.text.toString())
         outState.putString("qrg", qrgText.text.toString())		
         outState.putString("type", typeText.text.toString())	
-		
+		outState.putString("distance", distanceText.text.toString())	
+
 		// Save the visibility state of the views
 		outState.putInt("sourceVisibility", sourceText.visibility)
 		outState.putInt("locationVisibility", locationText.visibility)
@@ -131,7 +142,8 @@ class HudDisplay(
 		outState.putInt("courseVisibility", courseText.visibility)
 		outState.putInt("toCallVisibility", toCallText.visibility)
 		outState.putInt("qrgVisibility", qrgText.visibility)
-		outState.putInt("typeVisibility", typeText.visibility)		
+		outState.putInt("typeVisibility", typeText.visibility)
+		outState.putInt("distanceVisibility", distanceText.visibility)				
     }
 
 	fun restoreInstanceState(savedInstanceState: Bundle) {
@@ -146,6 +158,7 @@ class HudDisplay(
 		toCallText.text = savedInstanceState.getString("toCall", "")
 		qrgText.text = savedInstanceState.getString("qrg", "")
 		typeText.text = savedInstanceState.getString("type", "")
+		distanceText.text = savedInstanceState.getString("distance", "")
 
 		// Restore the visibility state of the views
 		sourceText.visibility = savedInstanceState.getInt("sourceVisibility", View.VISIBLE)
@@ -157,6 +170,7 @@ class HudDisplay(
 		toCallText.visibility = savedInstanceState.getInt("toCallVisibility", View.VISIBLE)
 		qrgText.visibility = savedInstanceState.getInt("qrgVisibility", View.VISIBLE)
 		typeText.visibility = savedInstanceState.getInt("typeVisibility", View.VISIBLE)
+		distanceText.visibility = savedInstanceState.getInt("distanceVisibility", View.VISIBLE)
 
 		// Retrieve the symbol from savedInstanceState
 		val savedSymbol = savedInstanceState.getString("symbol", "")

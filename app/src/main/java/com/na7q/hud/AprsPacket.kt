@@ -1,4 +1,6 @@
 package com.na7q.hud
+import kotlin.math.*
+import android.util.Log
 
 data class AprsPacket(
     val comment: String
@@ -392,19 +394,29 @@ data class AprsPacket(
 		// Function to get packet type based on the type character from the packet
 		fun getPacketType(packet: String): String {
 			// Get the character after ':' (if exists), otherwise return "Other"
-			val typeChar = packet.split(":").getOrNull(1)?.firstOrNull()
+			//val typeChar = packet.split(":").getOrNull(1)?.firstOrNull()
+			//val typeChar = packet.substringAfter(":", "").firstOrNull()
+
+			val payload = packet.substringAfter(":", "").trimStart()
+			val typeChar = payload.firstOrNull()
+
+			Log.d("PacketType", "Extracted typeChar: $typeChar") // Debugging line
 
 			// If no character after ':', return "Other"
-			return when (typeChar) {
-				'!', '=', '/', '@', '\'', '`' -> "Position"  // Includes Old Mic-E Data (TM-D700)
-				'T' -> "Telemetry"
-				'>' -> "Status"
-				'?' -> "Query"
-				';' -> "Object"
-				':' -> "Message"
-				'_' -> "Weather Report (No Position)"
-				'$' -> "Raw GPS Data"
-				'}' -> "Third-Party Traffic"
+			return when {
+				typeChar in listOf('!', '=', '/', '@', '\'', '`') -> "Position"  // Includes Old Mic-E Data (TM-D700)
+				typeChar == 'T' -> "Telemetry"
+				typeChar == '>' -> "Status"
+				typeChar == '?' -> "Query"
+				typeChar == ';' -> "Object"
+				typeChar == ':' && (payload.drop(10).startsWith(":PARM.") || 
+									payload.drop(10).startsWith(":UNIT.") || 
+									payload.drop(10).startsWith(":EQNS.") || 
+									payload.drop(10).startsWith(":BITS.")) -> "Telemetry"
+				typeChar == ':' -> "Message" // Default for normal messages
+				typeChar == '_' -> "Weather Report (No Position)"
+				typeChar == '$' -> "Raw GPS Data"
+				typeChar == '}' -> "Third-Party Traffic"
 				else -> "Other"  // For any other cases, default to "Other"
 			}
 		}
@@ -425,6 +437,30 @@ data class AprsPacket(
 			return packet.substringAfter(":").trim()  // Example: Extract everything after ":"
 		}
 		
+		fun handleMessages(packet: String): String {
+			// Step 1: Extract everything after the first ":"
+			val rawMessage = packet.substringAfter(":", "").trim()
+
+			if (rawMessage.isEmpty()) return "" // Return empty string if there's no message
+
+			// Step 2: Remove the first character (message type identifier)
+			val trimmedMessage = rawMessage.drop(1)
+
+			// Step 3: Extract the next 9 characters (toCallsign) and remove spaces
+			val toCallsign = trimmedMessage.take(9).replace(" ", "")
+
+			// Step 4: Remove the next character (separator) and extract the rest as the message
+			val remainingMessage = trimmedMessage.drop(10).trim() // Skip toCallsign + separator
+
+			// Step 5: Remove optional "{xxxxx}" sequence at the end (1 to 5 characters inside `{}`)
+			val cleanedMessage = remainingMessage.replace(Regex("\\{.{1,5}$"), "").trim()
+
+			// Step 6: Return a single formatted string
+			return "$toCallsign: $cleanedMessage".trim()
+		}
+
+			
+		
 		// Function to split the packet at the first ">" and return the part after it
 		fun getSource(packet: String): String? {
 			return packet.split(">").getOrNull(0)?.trim()
@@ -441,20 +477,13 @@ data class AprsPacket(
 
 			// Step 1: Check if it ends with micetocall characters (last 2 characters)
 			if (modifiedComment.length >= 2 && AprsPacket.micetocall(modifiedComment.takeLast(2)) != null) {
-				return modifiedComment.dropLast(2)  // Strip last 2 characters and return immediately
+				modifiedComment = modifiedComment.dropLast(2)  // Strip last 2 characters and return immediately
 			}
 
 			// Step 2: Check if it ends with kenwoodtocall (last 1 character)
 			if (modifiedComment.isNotEmpty() && AprsPacket.kenwoodtocall(modifiedComment.takeLast(1)) != null) {
 				modifiedComment = modifiedComment.dropLast(1)  // Strip last 1 character
 			}
-
-			// Step 3: Remove up to 3 characters before and including `}` if it appears in the first 4 characters
-			//val bracketIndex = modifiedComment.indexOf("}")
-			//if (bracketIndex in 0..3) {
-			//	val removeIndex = maxOf(0, bracketIndex - 3)  // Ensure we don't go negative
-			//	modifiedComment = modifiedComment.removeRange(removeIndex..bracketIndex).trim()
-			//}
 
 			// Step 3: Remove `}` and everything before it if it appears within the first 4 characters
 			val bracketIndex = modifiedComment.indexOf("}")
@@ -463,9 +492,8 @@ data class AprsPacket(
 			}
 
 			// Step 3: Remove specific prefixes ("PHGxxxx", "RNGxxxx", "DFSxxxx")
-			//val prefixPatterns = listOf("^PHG\\d{4}", "^RNG\\d{4}", "^DFS\\d{4}")		
 			val prefixPatterns = listOf(
-				"PHG\\d{4}/?",  // Matches PHG followed by exactly 4 digits, with an optional trailing slash
+				"PHG\\d{4,5}/?",  // Matches PHG followed by exactly 4 digits, with an optional trailing slash
 				"RNG\\d{4}/?",  // Matches RNG followed by exactly 4 digits, with an optional trailing slash
 				"DFS\\d{4}/?"   // Matches DFS followed by exactly 4 digits, with an optional trailing slash
 			)			
@@ -475,65 +503,109 @@ data class AprsPacket(
 			}
 
 			// Step 4: Remove altitude format "/A=XXXXX" where X can be positive or negative digits
-			//val altitudePattern = "/A=-?\\d{6}".toRegex()
 			val altitudePattern = "/?A=(-\\d{5}|\\d{6})".toRegex()	
 			modifiedComment = modifiedComment.replace(altitudePattern, "").trim()
 
 			// Step 5: Remove "XXX/YYY" or "XXX/YYY/A=ZZZZZ" format
-			//val coursespeedPattern = "^\\d{3}/\\d{3}(/A=-?\\d{6})?".toRegex()
 			val coursespeedPattern = "^\\d{3}/\\d{3}(/A=(-?\\d{5}|\\d{6}))?/?".toRegex()
 			
 			modifiedComment = modifiedComment.replace(coursespeedPattern, "").trim()
 
-/* 			// Step 6: Remove Weather & Telemetry Data
-			val weatherPatterns = listOf(
-				"\\.\\.\\./\\.\\.\\.",  // Matches ".../..." (Direction/Speed missing)
-				"\\.\\.\\./\\d{3}",    // Matches ".../XXX" (Speed missing)
-				"\\d{3}/\\.\\.\\.",    // Matches "XXX/..." (Direction missing)				
-				"c[\\d.]{3}",  // Course (cXXX or c...)
-				"s[\\d.]{3}",  // Speed (sXXX or s...)				
-				"g[\\d.]{3}",  // Wind Gust (gXXX or g...)				
-				"t[\\d.]{3}",  // Temperature (tXXX or t...)
-				"r[\\d.]{3}",  // Rainfall in last hour (rXXX or r...)
-				"p[\\d.]{3}",  // Rainfall in last 24 hours (pXXX or p...)
-				"P[\\d.]{3}",  // Rainfall since midnight (PXXX or P...)
-				"h[\\d.]{2,3}", // Humidity (hXX, hXXX or h..)
-				"b[\\d.]{5}",  // Barometric Pressure (bXXXXX or b.....)
-				"L[\\d.]{3}"  // Luminosity (LXXX or L...)
-				 */
-				 
 			val weatherPatterns = listOf(
 				"\\.\\.\\./\\.\\.\\.",  // Matches ".../..." (Direction/Speed missing)
 				"\\.\\.\\./\\d{3}",    // Matches ".../XXX" (Speed missing)
 				"\\d{3}/\\.\\.\\.",    // Matches "XXX/..." (Direction missing)				
 				"c\\d{3}",  // Course (cXXX)
-				"c\\.\\.\\.",  // Course missing (c...)
+				"c[ .]{3}",  // Course missing (c...)
 				"s\\d{3}",  // Speed (sXXX)
-				"s\\.\\.\\.",  // Speed missing (s...)				
+				"s[ .]{3}",  // Speed missing (s...)				
 				"g\\d{3}",  // Wind Gust (gXXX)
-				"g\\.\\.\\.",  // Wind Gust missing (g...)				
+				"g[ .]{3}",  // Wind Gust missing (g...)				
 				"t\\d{3}",  // Temperature (tXXX)
-				"t\\.\\.\\.",  // Temperature missing (t...)
+				"t[ .]{3}",  // Temperature missing (t...)
 				"r\\d{3}",  // Rainfall in last hour (rXXX)
-				"r\\.\\.\\.",  // Rainfall missing (r...)
+				"r[ .]{3}",  // Rainfall missing (r...)
 				"p\\d{3}",  // Rainfall in last 24 hours (pXXX)
-				"p\\.\\.\\.",  // Rainfall missing (p...)
+				"p[ .]{3}",  // Rainfall missing (p...)
 				"P\\d{3}",  // Rainfall since midnight (PXXX)
-				"P\\.\\.\\.",  // Rainfall missing (P...)
+				"P[ .]{3}",  // Rainfall missing (P...)
 				"h\\d{2,3}", // Humidity (hXX or hXXX)
-				"h\\.{2,3}",  // Humidity missing (h.. or h...)
+				"h[ .]{2,3}",  // Humidity missing (h.. or h...)
 				"b\\d{5}",  // Barometric Pressure (bXXXXX)
-				"b\\.\\.\\.\\.\\.",  // Barometric Pressure missing (b.....)
+				"b[ .]{3,5}",		
 				"L\\d{3}",  // Luminosity (LXXX)
-				"L\\.\\.\\."   // Luminosity missing (L...)
+				"L[ .]{3}"   // Luminosity missing (L...)
 			)
 			
 			for (pattern in weatherPatterns) {
 				modifiedComment = modifiedComment.replace(pattern.toRegex(), "").trim()
 			}
-			
+
+			// Step 8: Remove Base91 telemetry if present
+			val base91TelemetryRegex = """\|[^|]{2,12}\|""".toRegex()
+			modifiedComment = modifiedComment.replace(base91TelemetryRegex, "").trim()
+
+			// Step 9: Remove APRS `!data!` segments (e.g., "!wF$!")
+			val exclamationData = """![!-~]+!""".toRegex()
+			modifiedComment = modifiedComment.replace(exclamationData, "").trim()
+							
 			// Return the modified comment after all transformations
 			return modifiedComment
+		}
+
+
+		fun calculateDistanceAndBearing(
+			myLat: Double, myLon: Double, 
+			targetLat: Double, targetLon: Double): Pair<String, String> {
+			
+			if (myLat == 0.0 || myLon == 0.0 || targetLat == 0.0 || targetLon == 0.0) {
+				return Pair("", "") // Return 0 distance if invalid coordinates
+			}
+
+			val R = 6371.0 // Earth radius in KM
+			val lat1 = Math.toRadians(myLat)
+			val lon1 = Math.toRadians(myLon)
+			val lat2 = Math.toRadians(targetLat)
+			val lon2 = Math.toRadians(targetLon)
+
+			// Haversine Formula for Distance
+			val dLat = lat2 - lat1
+			val dLon = lon2 - lon1
+			val a = sin(dLat / 2).pow(2) + cos(lat1) * cos(lat2) * sin(dLon / 2).pow(2)
+			val c = 2 * atan2(sqrt(a), sqrt(1 - a))
+			val distanceKm = R * c
+			val distanceMiles = (distanceKm * 0.621371)
+				.toBigDecimal().setScale(1, java.math.RoundingMode.HALF_UP).toDouble() // ✅ Round to 1 decimal
+
+			// Remove ".0" if applicable
+			val formattedDistance = if (distanceMiles % 1.0 == 0.0) {
+				distanceMiles.toInt().toString() // Convert to Int if no decimal part
+			} else {
+				distanceMiles.toString() // Keep decimal if it exists
+			}
+
+			// Bearing Calculation
+			val y = sin(dLon) * cos(lat2)
+			val x = cos(lat1) * sin(lat2) - sin(lat1) * cos(lat2) * cos(dLon)
+			var bearing = Math.toDegrees(atan2(y, x))
+
+			if (bearing < 0) {
+				bearing += 360.0 // Normalize to 0-360 degrees
+			}
+
+			val direction = getCardinalDirection(bearing)
+
+			//return Pair(distanceMiles, direction)
+			return Pair(formattedDistance, direction)
+			
+		}
+
+		// Convert Bearing to Cardinal Directions (N, NE, E, SE, etc.)
+		fun getCardinalDirection(bearing: Double): String {
+			val directions = arrayOf("N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
+									 "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW")
+			val index = ((bearing + 11.25) / 22.5).toInt() % 16
+			return directions[index]
 		}
 	}
 }

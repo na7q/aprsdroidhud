@@ -16,9 +16,18 @@ import java.util.Date
 import java.util.Locale
 import android.graphics.Bitmap //preload
 import android.graphics.BitmapFactory //preload
+import android.location.Location
+import com.google.android.gms.location.*
+import androidx.core.app.ActivityCompat
+import android.Manifest
+import android.content.pm.PackageManager
+
 
 class MainActivity : AppCompatActivity() {
     private lateinit var hudDisplay: HudDisplay
+    private lateinit var fusedLocationClient: FusedLocationProviderClient
+    private lateinit var locationRequest: LocationRequest
+    private lateinit var locationCallback: LocationCallback
 
     private var lastReceivedTimestamp: Long = 0
     private var incrementingTimestamp: Long = 0
@@ -28,6 +37,10 @@ class MainActivity : AppCompatActivity() {
 	//preload bitmap
     companion object {
         lateinit var iconBitmap: Bitmap
+		var mylat: Double = 0.0  // ✅ Default to 0.0 instead of null
+		var mylon: Double = 0.0  // ✅ Default to 0.0 instead of null
+        private const val LOCATION_PERMISSION_REQUEST_CODE = 1001
+		
     }
 
     // Runnable to update the timestamp every second
@@ -95,18 +108,19 @@ class MainActivity : AppCompatActivity() {
 			findViewById(R.id.toCallText),
 			findViewById(R.id.currentTimeText),
 			findViewById(R.id.qrgText),
-			findViewById(R.id.typeText),			
+			findViewById(R.id.typeText),
+			findViewById(R.id.distanceText),			
 			symbolImageView // Pass the SymbolView to HudDisplay
 		)
 		Log.d("MainActivity", "HudDisplay initialized")
 
 		// Register the APRSdroid receiver using AprsReceiver
-		aprsReceiver = AprsReceiver { source, location, callsign, packet, comment, symbol, speed, course, model, qrg, type -> 
+		aprsReceiver = AprsReceiver { source, location, callsign, packet, comment, symbol, speed, course, model, qrg, type, distance -> 
 			// Log received data
 			Log.d("MainActivity", "Received APRS data: source=$source, location=$location, callsign=$callsign, packet=$packet, comment=$comment, symbol=$symbol, speed=$speed, course=$course, model=$model, qrg=$qrg")
 			
 			// Update the HUD with the received data
-			hudDisplay.updateHud(source, location, callsign, packet, comment, symbol, speed, course, model, qrg, type)
+			hudDisplay.updateHud(source, location, callsign, packet, comment, symbol, speed, course, model, qrg, type, distance)
 
 			// Log timestamp reset and update
 			Log.d("MainActivity", "Resetting timestamp to current time")
@@ -138,8 +152,42 @@ class MainActivity : AppCompatActivity() {
             hudDisplay.restoreInstanceState(it)
             lastReceivedTimestamp = it.getLong("lastReceivedTimestamp", 0)
         }
-		
-	}
+
+        // Initialize GPS tracking
+        setupGps()
+    }
+
+    private fun setupGps() {
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+
+        locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 5000)
+            .setMinUpdateIntervalMillis(3000)
+            .build()
+
+        locationCallback = object : LocationCallback() {
+            override fun onLocationResult(locationResult: LocationResult) {
+                for (location in locationResult.locations) {
+                    updateLocation(location)
+                }
+            }
+        }
+
+        requestLocationUpdates()
+    }
+
+    private fun requestLocationUpdates() {
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), LOCATION_PERMISSION_REQUEST_CODE)
+            return
+        }
+        fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, Looper.getMainLooper())
+    }
+
+    private fun updateLocation(location: Location) {
+        mylat = location.latitude
+        mylon = location.longitude
+        Log.d("MainActivity", "Updated GPS: mylat=$mylat, mylon=$mylon")
+    }
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
@@ -159,5 +207,6 @@ class MainActivity : AppCompatActivity() {
         // Remove the timestamp update handler
         Log.d("MainActivity", "Removing timestamp update handler callbacks")
         updateHandler.removeCallbacks(timestampRunnable)
+        fusedLocationClient.removeLocationUpdates(locationCallback)
     }
 }
